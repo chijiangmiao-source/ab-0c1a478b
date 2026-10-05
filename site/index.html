@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>离线航迹交换站 · 可恢复航点索引</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">航</span>
+    <div>
+      <h1>离线航迹交换站</h1>
+      <p class="sub">阶数 4 B+ 树 · 写时复制 · 三阶段持久化（新页 → 批次意图 → 根切换）· IndexedDB</p>
+    </div>
+  </div>
+  <div id="backendBadge" class="badge">存储：初始化中…</div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>1. 批次编辑</h2>
+    <p class="hint">稳定批次标识用于幂等重传：同一标识 + 等价编辑重放原回执；内容不同将被拒绝。每批至多 12 项，全库至多 24 个互异整数键。</p>
+    <div class="row">
+      <label>稳定批次标识
+        <input id="batchId" type="text" maxlength="64" placeholder="例如 batch-20261005-01">
+      </label>
+      <span class="grow"></span>
+      <button class="ghost" id="btnFillSplit" type="button">填入分裂样例</button>
+      <button class="ghost" id="btnClearRows" type="button">清空编辑行</button>
+    </div>
+    <table class="edits" id="editsTable">
+      <thead><tr><th style="width:110px">操作</th><th style="width:160px">整数键</th><th>短文本载荷（插入/更新必填）</th><th style="width:48px"></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row">
+      <button id="btnAddRow" type="button" class="ghost">＋ 增加一项（余 <span id="rowsLeft">11</span>）</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2. 持久化与中断演习</h2>
+    <div class="row wrap">
+      <label class="check"><input type="checkbox" id="crashEnabled"> 在选定持久化阶段后模拟断电</label>
+      <label>中断点
+        <select id="crashStage">
+          <option value="pages-mid">阶段1 · 新页写入中途</option>
+          <option value="pages" selected>阶段1 · 新页与清单完成后</option>
+          <option value="intent">阶段2 · 批次意图留下后</option>
+          <option value="root">阶段3 · 根指针切换后（收尾前）</option>
+        </select>
+      </label>
+      <label id="afterPagesWrap">已写入页数
+        <input type="number" id="crashAfterPages" min="1" max="20" value="1" style="width:90px">
+      </label>
+      <label class="check"><input type="checkbox" id="memoryMode"> 演习使用内存后端（不写入 IndexedDB）</label>
+    </div>
+    <div class="row wrap">
+      <button class="primary" id="btnCommit" type="button">提交批次</button>
+      <button id="btnReopen" type="button">重开复核</button>
+      <button class="ghost" id="btnRefresh" type="button">刷新可查询视图</button>
+      <button class="danger ghost" id="btnWipe" type="button">清空 IndexedDB</button>
+    </div>
+    <div id="messages" class="messages" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="card">
+    <h2>3. 结果页 · 已发布索引</h2>
+    <div class="metrics" id="metrics"></div>
+    <h3>按键有序的叶序列</h3>
+    <div id="onceBadge" class="once-badge">—</div>
+    <div class="tablewrap">
+      <table class="data" id="leafTable">
+        <thead><tr><th>#</th><th>键</th><th>短文本载荷</th><th>所属叶页</th><th>页代次</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <h3>可达页清单</h3>
+    <div class="tablewrap">
+      <table class="data" id="pagesTable">
+        <thead><tr><th>页标识（摘要前缀）</th><th>类型</th><th>深度</th><th>代次</th><th>键 / 子页</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <h3>批次回执</h3>
+    <div class="tablewrap">
+      <table class="data" id="receiptsTable">
+        <thead><tr><th>批次标识</th><th>基代次→根代次</th><th>编辑数</th><th>回执标识</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  不变量：任意断电点后重开，航点索引只停在<em>旧根</em>或<em>可从根完整遍历的新根</em>；半写入页绝不进入可查询视图。
+</footer>
+
+<script type="module" src="./app.mjs"></script>
+</body>
+</html>
